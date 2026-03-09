@@ -4,17 +4,15 @@
 #include <WiFi.h>
 #define SEP "/"
 #define COURSE "OOCSI-things"
-#define TEAM "team-10"
-#define THING "LDR-Send"
+#define TEAM "team-XX"
+#define THING "name_your_thing_here"
+
 const char* OOSCIName = COURSE SEP TEAM SEP THING;
 const char* OOSCIChannel = COURSE SEP TEAM;
 
-//const char* ssid = "iotroam";
-//const char* password = "12AJkmnLHy";
+//const char* ssid = "iotroam"; // Change if you are not using iotroam
+//const char* password = "your_password_here";
 const char* hostserver = "oocsi.id.tue.nl";
-
-const char* ssid = "VoidNetwork";
-const char* password = "g6745rYfBqbqNRRcqwa6";
 
 OOCSI oosci = OOCSI();
 const int ldrPin = 0;
