@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>OOCSI Light Sensor · Test</title>
+
+<script src="https://oocsi.id.tue.nl/assets/js/oocsi-web.js"></script>
+
+<style>
+:root{
+--bg:#0b0d1a;
+--card:#12152a;
+--border:rgba(80,120,255,.2);
+--text:#c8d4ff;
+--dim:#46506e;
+--accent:#4d7cff;
+--mono:'Courier New',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+background:var(--bg);
+color:var(--text);
+font-family:system-ui,sans-serif;
+min-height:100vh;
+padding:28px 20px;
+display:flex;
+flex-direction:column;
+align-items:center;
+gap:20px;
+}
+.card{
+background:var(--card);
+border:1px solid var(--border);
+border-radius:16px;
+padding:24px;
+width:100%;
+max-width:560px;
+}
+.card-title{
+font-size:11px;
+font-family:var(--mono);
+letter-spacing:.12em;
+color:var(--dim);
+margin-bottom:16px;
+}
+canvas{
+width:100%;
+height:120px;
+display:block;
+border-radius:8px;
+}
+.log{
+display:flex;
+flex-direction:column;
+gap:4px;
+max-height:200px;
+overflow-y:auto;
+}
+.log-entry{
+font-family:var(--mono);
+font-size:11px;
+color:var(--dim);
+border-left:2px solid var(--border);
+padding:4px 10px;
+word-break:break-all;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+<div class="card-title">Connection</div>
+<input type="text" id="server" value="oocsi.id.tue.nl"/>
+<input type="text" id="course" value="OOCSI-things"/>
+<input type="text" id="team" value="team-10"/>
+<button onclick="doConnect()">CONNECT</button>
+<button onclick="doDemo()">DEMO</button>
+<button onclick="doDisconnect()">DISCONNECT</button>
+<div id="status-text">Disconnected</div>
+</div>
+
+<div class="card">
+<div class="card-title">Live Value</div>
+<div id="big-val" style="font-family:Courier New;font-size:64px">—</div>
+</div>
+
+<div class="card">
+<div class="card-title">Rolling History</div>
+<canvas id="chart" width="800" height="120"></canvas>
+</div>
+
+<div class="card">
+<div class="card-title">Raw Messages</div>
+<div class="log" id="log"></div>
+</div>
+
+<div class="card">
+<div class="card-title">Crystal Sphere Visualization</div>
+<canvas id="sphere" width="800" height="260"></canvas>
+</div>
+
+<script>
+let history=[];
+let activeKey=null;
+let currentValue=0;
+let demoInterval=null;
+
+function channelName(){
+return `${course.value}/${team.value}`;
+}
+function clientName(){
+return `${channelName()}/browser-receiver`;
+}
+
+function doConnect(){
+OOCSI.connect(`wss://${server.value}/ws`,clientName());
+setTimeout(()=>{
+OOCSI.subscribe(channelName(),handleMessage);
+document.getElementById('status-text').textContent='Connected';
+},600);
+}
+
+function doDisconnect(){
+clearInterval(demoInterval);
+try{OOCSI.disconnect()}catch(e){}
+document.getElementById('status-text').textContent='Disconnected';
+}
+
+function doDemo(){
+let t=0;
+demoInterval=setInterval(()=>{
+t+=0.04;
+handleMessage({data:{voltage:1.65+Math.sin(t)*1.4}});
+},80);
+}
+
+function handleMessage(msg){
+const data=msg.data||msg;
+const key=Object.keys(data).find(k=>typeof data[k]==='number');
+if(!key)return;
+
+activeKey=key;
+currentValue=data[key];
+document.getElementById('big-val').textContent=currentValue.toFixed(3);
+
+history.push(currentValue);
+if(history.length>60)history.shift();
+drawChart();
+
+const log=document.getElementById('log');
+const div=document.createElement('div');
+div.className='log-entry';
+div.textContent=JSON.stringify(data);
+log.prepend(div);
+
+while(log.children.length>80)log.lastChild.remove();
+}
+
+const chart=document.getElementById('chart');
+const ctx=chart.getContext('2d');
+
+function drawChart(){
+ctx.clearRect(0,0,chart.width,chart.height);
+if(history.length<2)return;
+const min=Math.min(...history);
+const max=Math.max(...history);
+const range=Math.max(max-min,.001);
+const step=chart.width/(history.length-1);
+ctx.beginPath();
+history.forEach((v,i)=>{
+const x=i*step;
+const y=chart.height-((v-min)/range)*chart.height;
+i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+});
+ctx.strokeStyle='#4d7cff';
+ctx.stroke();
+}
+
+const sphere=document.getElementById('sphere');
+const sctx=sphere.getContext('2d');
+let rot=0;
+
+function drawSphere(){
+const W=sphere.offsetWidth*devicePixelRatio;
+const H=sphere.offsetHeight*devicePixelRatio;
+sphere.width=W;
+sphere.height=H;
+
+const cx=W/2;
+const cy=H/2;
+const baseRadius=Math.min(W,H)*0.22;
+
+sctx.clearRect(0,0,W,H);
+
+const norm=Math.min(Math.max(currentValue/3.3,0),1);
+const spikes=Math.floor(12+norm*64);
+const spikeLen=norm*baseRadius*2.4;
+
+for(let l=0;l<3;l++){
+const depth=1-l*0.28;
+sctx.beginPath();
+for(let i=0;i<spikes;i++){
+const a=(i/spikes)*Math.PI*2+rot*(0.3+l*0.12);
+const n=Math.sin(i*3.1+rot*2.4)*0.5+0.5;
+const r=baseRadius*depth+spikeLen*n*depth;
+const x=cx+Math.cos(a)*r;
+const y=cy+Math.sin(a)*r;
+i===0?sctx.moveTo(x,y):sctx.lineTo(x,y);
+}
+sctx.closePath();
+sctx.strokeStyle=`rgba(77,124,255,${0.25+l*0.18})`;
+sctx.stroke();
+}
+
+rot+=0.008;
+requestAnimationFrame(drawSphere);
+}
+
+drawSphere();
+</script>
+
+</body>
+</html>
