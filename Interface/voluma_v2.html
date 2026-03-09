@@ -1,0 +1,97 @@
+<html><head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" type="text/css" href="https://oocsi.id.tue.nl/assets/css/pico.indigo.min.css">
+  <script type="text/javascript" src="https://oocsi.id.tue.nl/assets/js/p5.min.js"></script>
+  <script type="text/javascript" src="https://oocsi.id.tue.nl/assets/js/oocsi-web.js"></script>
+  <script type="text/javascript" src="https://oocsi.id.tue.nl/assets/js/things/oocsi-things.min.js"></script>
+<style>
+  #status-bar {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.6);
+    color: #aac;
+    font-family: monospace;
+    font-size: 12px;
+    padding: 6px 16px;
+    border-radius: 20px;
+    z-index: 10;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+  <div id="status-bar">Connecting to OOCSI…</div>
+  <div id="canvasContainer"></div>
+
+<script type="text/javascript">
+
+  // ── OOCSI config ──────────────────────────────────────────
+  const OOCSI_SERVER  = "oocsi.id.tue.nl";
+  const OOCSI_CHANNEL = "OOCSI-things/team-10";
+  const OOCSI_CLIENT  = "OOCSI-things/team-10/voluma-display";
+
+  // Shared state: ldr voltage (0–3.3 V) mapped to 0–1
+  let ldrLevel = 0;
+
+  // Connect and subscribe
+  OOCSI.connect(`wss://${OOCSI_SERVER}/ws`, OOCSI_CLIENT);
+  setTimeout(() => {
+    OOCSI.subscribe(OOCSI_CHANNEL, function(msg) {
+      const data = msg.data || msg;
+      if (data.ldr !== undefined) {
+        // map 0–3.3 V → 0–1
+        ldrLevel = Math.max(0, Math.min(1, data.ldr / 3.3));
+        document.getElementById('status-bar').textContent =
+          `LDR: ${data.ldr.toFixed(3)} V  ·  Live · ${OOCSI_CHANNEL}`;
+      }
+    });
+    document.getElementById('status-bar').textContent = `Subscribed · ${OOCSI_CHANNEL}`;
+  }, 600);
+
+  // ── p5.js sketch ─────────────────────────────────────────
+  function setup() {
+    let canvas = createCanvas(windowWidth, windowHeight);
+    canvas.parent('canvasContainer');
+    frameRate(10);
+  }
+
+  function draw() {
+    background(0);
+
+    let vol = ldrLevel;   // 0–1, driven by LDR
+
+    // Constrain sizes: rings stay fully inside the canvas
+    // Outer ring max = 80% of shortest edge, so it never clips
+    let safe = min(width, height) * 0.80;
+    let minR = 30;
+
+    let s1 = map(vol, 0, 1, minR,        safe * 0.25);
+    let s2 = map(vol, 0, 1, minR * 1.5,  safe * 0.50);
+    let s3 = map(vol, 0, 1, minR * 2,    safe * 0.75);
+    let s4 = map(vol, 0, 1, minR * 2.5,  safe);
+
+    // Filled circle — brightness tied to light level
+    noStroke();
+    fill(255, map(vol, 0, 1, 255, 10));
+    ellipse(width/2, height/2, s1, s1);
+
+    fill(255, 20);
+    stroke(255);
+    ellipse(width/2, height/2, s2, s2);
+
+    noFill();
+    stroke(155);
+    ellipse(width/2, height/2, s3, s3);
+
+    stroke(55);
+    ellipse(width/2, height/2, s4, s4);
+  }
+
+  function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+  }
+</script>
+</body></html>
