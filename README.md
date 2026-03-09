@@ -39,6 +39,9 @@ The ESP32 reads voltage from the LDR and sends the data to an OOCSI channel.
 3. Configure your WiFi credentials (`ssid` and `password`) and the OOCSI server address (`oocsi.id.tue.nl`).
 4. Flash the code to your ESP32.
 
+<img width="2044" height="2576" alt="circuit_image" src="https://github.com/user-attachments/assets/112c75be-433f-4784-a8a5-da6313d6fcc6" />
+
+
 ### 2. Digital Visualization (Voluma)
 
 The web interface displays live sensor values and a "Crystal Sphere" visualization.
